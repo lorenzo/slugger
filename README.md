@@ -1,9 +1,9 @@
 # Slugger
 
 [Slugger][3] is a plugin that basically rewrites cake urls (using routing) into
-slugged urls automatically using a named parameter.
+slugged urls automatically using normal passed arguments
 
-    '/posts/view/Post:12'
+    '/posts/view/1'
 
 automatically becomes
 
@@ -16,36 +16,36 @@ by [Mark Story's blog][1]).
 
 ## Requirements
 
-* CakePHP 2.0.x (check tags for older versions of CakePHP)
+* CakePHP 2.x (check tags for older versions of CakePHP)
 
 ## Usage
 
-    App::uses('SluggableRoute', 'Slugger.Lib');
+    App::uses('SluggableRoute', 'Slugger.Routing/Route');
 
-    Router::connect(/posts/:action/*,
-        array(),
+    Router::connect(/posts/:Post,
+        array('controller' => 'posts', 'action' => 'view'),
         array(
             'routeClass' => 'SluggableRoute',
             'models' => array('Post')
         )
     );
 
-In order for it to work, the named parameter needs to be named the model's name
-and the value needs to be the primaryKey value. Passing a cake url array such as
+As you can see, you need to match the special regex params `:Model` with the
+`models` key in the third argument. You can use as many models as you like. You don't
+need to change the usual urls produced by a cake bake, for example:
 
     array(
         'controller' => 'posts',
         'action' => 'view',
-        'Post' => 12
+        12
     )
 
-turns into a url string like `/posts/view/my-post-title`, then back into the
-proper request for your controller to handle by putting `'Post' => 12` back
-into the named parameters. In your controller, get the post id by checking
+turns into a url string like `/posts/my-post-title`, then back into the
+proper request for your controller to handle by putting `12` back
+into the the passed arguments. In your controller, get the post id by checking
 `passedArgs`.
 
-    function view() {
-        $id = $this->passedArgs['Post'];
+    function view($id) {
         $post = $this->Post->read(null, $id);
         // do controller stuff
     }
@@ -53,8 +53,8 @@ into the named parameters. In your controller, get the post id by checking
 By default, the field used for the slug is the model's `displayField`. To change
 this, change your connection to:
 
-    Router::connect('/posts/:action/*',
-        array(),
+    Router::connect('/posts/:Post',
+        array('controller' => 'posts', 'action' => 'view'),
         array(
             'routeClass' => 'SluggableRoute',
             'models' => array('Post' => 'different_field')
@@ -79,8 +79,8 @@ For example, to use a custom function:
         );
         return strtolower(preg_replace(array_keys($merge), array_values($merge), $str));
     }
-    Router::connect('/posts/:action/*',
-        array(),
+    Router::connect('/posts/:Post',
+        array('controller' => 'posts', 'action' => 'view'),
         array(
             'routeClass' => 'SluggableRoute',
             'models' => array('Post'),
@@ -102,14 +102,12 @@ you'll need to remove the cache. For example, updating a User's username
 
     $this->User->id = 3;
     $this->User->saveField('username', 'newUsername');
-    $Route = new SluggableRoute('/', array(), array('models' => array('User')));
-    $success = $Route->invalidateCache('User', $this->User->id);
+    SluggableRoute::invalidateCache('User', $this->User->id);
 
 Invalidating after saves and deletions is a good idea. You can also remove all
 of the cache for an entire model like so:
 
-    $Route = new SluggableRoute('/', array(), array('models' => array('User')));
-    $success = $Route->invalidateCache('User');
+    SluggableRoute::invalidateCache('User');
 
 ## Notes and Features
 
@@ -117,7 +115,7 @@ of the cache for an entire model like so:
   options.
 * If a model has (what will become) duplicate slugs, sluggable route will
   automatically prepend the id to the slug so it doesn't conflict
-* If no slug is found, it will fall back to the original `Post:12` url so you
+* If no slug is found, it will fall back to the original `12` url so you
   don't have to change anything in your database
 * Don't think of this as permalinks! These are just to make your url's a little
   prettier
@@ -152,3 +150,4 @@ Redistributions of files must retain the above copyright notice.
 ## Authors
 
 * Pierre Martin (real34) - Cache invalidation
+* Jose Lorenzo Rodriguez (lorenzo) - Got rid of named parameters

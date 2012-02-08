@@ -12,6 +12,8 @@
  * @license       MIT License (http://www.opensource.org/licenses/mit-license.php)
  */
 
+ App::uses('ClassRegistry', 'Utility');
+
 /**
  * Sluggable Route
  *
@@ -32,32 +34,37 @@ class SluggableRoute extends CakeRoute {
  */
     public function parse($url) {
 		$params = parent::parse($url);
-
 		if (empty($params)) {
 			return false;
 		}
 
-		if (isset($this->options['models']) && !empty($params['pass'])) {
+		if (isset($this->options['models'])) {
+			$i = -1;
+			$passed = array();
 			foreach ($this->options['models'] as $checkNamed => $slugField) {
+				$i++;
 				if (is_numeric($checkNamed)) {
 					$checkNamed = $slugField;
 					$slugField = null;
 				}
+				$passed[$i] = null;
+				if (!isset($params[$checkNamed])) {
+					return false;
+				}
+				$slug = $params[$checkNamed];
 				$slugSet = $this->getSlugs($checkNamed, $slugField);
 				if (empty($slugSet)) {
-					continue;
+					return false;
 				}
 				$slugSet = array_flip($slugSet);
-				foreach ($params['pass'] as $key => $pass) {
-					if (isset($slugSet[$pass])) {
-						unset($params['pass'][$key]);
-						$params['named'][$checkNamed] = $slugSet[$pass];
-					}
+				if (!isset($slugSet[$slug])) {
+					return false;
 				}
+				$passed[$i] = $slugSet[$slug];
 			}
+			$params['pass'] = array_merge($passed, isset($params['pass']) ? $params['pass'] : array());
 			return $params;
 		}
-		
 		return false;
 	}
 
@@ -69,20 +76,23 @@ class SluggableRoute extends CakeRoute {
  */
 	public function match($url) {
 		if (isset($this->options['models'])) {
+			$i = -1;
 			foreach ($this->options['models'] as $checkNamed => $slugField) {
+				$i++;
 				if (is_numeric($checkNamed)) {
 					$checkNamed = $slugField;
 					$slugField = null;
 				}
-				if (isset($url[$checkNamed])) {
+				if (isset($url[$i])) {
 					$slugSet = $this->getSlugs($checkNamed, $slugField);
 					if (empty($slugSet)) {
-						continue;
+						return false;
 					}
-					if (isset($slugSet[$url[$checkNamed]])) {
-						$url[] = $slugSet[$url[$checkNamed]];
-						unset($url[$checkNamed]);
+					if (!isset($slugSet[$url[$i]])) {
+						return false;
 					}
+					$url[$checkNamed] = $slugSet[$url[$i]];
+					unset($url[$i]);
 				}
 			}
 		}
@@ -180,6 +190,15 @@ class SluggableRoute extends CakeRoute {
  * @return boolean True if the value was succesfully deleted, false if it didn't exist or couldn't be removed
  */
 	public function invalidateCache($modelName, $id = null) {
+		$Route = new SluggableRoute('/', array(), array('models' => array($modelName)));
+		return $Route->_clearCache($modelName, $id);
+	}
+
+/**
+ * Auxiliary function to delete cache
+ *
+ */
+	protected function _clearCache($modelName, $id) {
 		$cacheConfig = $this->_initSluggerCache();
 
 		if (is_null($id)) {
